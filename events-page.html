@@ -1,0 +1,79 @@
+<dom-module id="events-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			vaadin-checkbox {
+				margin: 10px;
+			}
+			vaadin-text-field {
+				margin: 0 10px;
+				width: 1000px;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+				width: 160px;
+			}
+			.message-example {
+				margin: 10px;
+				color: grey;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<vaadin-checkbox checked="{{events.rank.enabled}}">Rank events enabled</vaadin-checkbox>
+			<vaadin-text-field label="Twitch chat rank text" value="{{events.rank.message}}"></vaadin-text-field>
+			<div class="message-example">[[_rankExample(events.rank.message)]]</div>
+			<vaadin-checkbox checked="{{events.pp.enabled}}">PP events enabled</vaadin-checkbox>
+			<vaadin-text-field label="Twitch chat pp text" value="{{events.pp.message}}"></vaadin-text-field>
+			<div class="message-example">[[_ppExample(events.pp.message)]]</div>
+			<vaadin-checkbox checked="{{events.topRanks.enabled}}">Top rank events enabled</vaadin-checkbox>
+			<vaadin-text-field label="Twitch chat top rank text" value="{{events.topRanks.message}}"></vaadin-text-field>
+			<div class="message-example">[[_topRanksExample(events.topRanks.message)]]</div>
+			<vaadin-button on-click="_save">Save</vaadin-button>
+		</div>
+		<paper-toast id="toast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class EventsPage extends Polymer.Element {
+			static get is() { return 'events-page'; }
+
+			static get properties() {
+				return {
+					
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('config', (event, args) => {
+					this.events = args.events;
+				});
+			}
+
+			_save() {
+				ipcRenderer.send('eventsConfig', this.events);
+				this.message = 'Settings saved';
+				this.$.toast.open();
+			}
+
+			_rankExample(message) {
+				message = message.replace(/{rank}/g, '1');
+				message = message.replace(/{rankChange}/g, '+1');
+				return message;
+			}
+
+			_ppExample(message) {
+				message = message.replace(/{ppChange}/g, '+0.1');
+				return message;
+			}
+
+			_topRanksExample(message) {
+				message = message.replace(/{username}/g, 'Cookiezi');
+				message = message.replace(/{rank}/g, '1');
+				message = message.replace(/{beatmap}/g, 'yuuyu - Scrap Syndrome [Heavy Rain]');
+				return message;
+			}
+		}
+
+		window.customElements.define(EventsPage.is, EventsPage);
+	</script>
+</dom-module>

@@ -1,0 +1,62 @@
+<dom-module id="levels-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			vaadin-checkbox {
+				margin: 10px;
+			}
+			vaadin-text-field {
+				margin: 0 10px;
+				width: 1000px;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+				width: 160px;
+			}
+			.message-example {
+				margin: 10px;
+				color: grey;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<vaadin-checkbox checked="{{levels.enabled}}">Levels enabled</vaadin-checkbox>
+			<vaadin-text-field label="Twitch chat rank text" value="{{levels.message}}"></vaadin-text-field>
+			<div class="message-example">[[_messageExample(levels.message)]]</div>
+			<vaadin-button on-click="_save">Save</vaadin-button>
+		</div>
+		<paper-toast id="toast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class LevelsPage extends Polymer.Element {
+			static get is() { return 'levels-page'; }
+
+			static get properties() {
+				return {
+					
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('config', (event, args) => {
+					this.levels = args.levels;
+				});
+			}
+
+			_save() {
+				ipcRenderer.send('levelsConfig', this.levels);
+				this.message = 'Settings saved';
+				this.$.toast.open();
+			}
+
+			_messageExample(message) {
+				message = message.replace(/{username}/g, 'GVmG');
+				message = message.replace(/{channel}/g, 'HappyStick');
+				message = message.replace(/{level}/g, '150');
+				return message;
+			}
+		}
+
+		window.customElements.define(LevelsPage.is, LevelsPage);
+	</script>
+</dom-module>

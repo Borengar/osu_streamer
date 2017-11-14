@@ -1,0 +1,57 @@
+<dom-module id="viewers-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			vaadin-checkbox {
+				margin: 10px;
+			}
+			vaadin-text-field {
+				margin: 0 10px;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+				width: 160px;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<vaadin-checkbox checked="{{viewers.enabled}}">Enabled</vaadin-checkbox>
+			<vaadin-text-field label="File path" value="{{viewers.filePath}}"></vaadin-text-field>
+			<vaadin-text-field label="Viewers per file" value="{{viewers.viewersPerFile}}"></vaadin-text-field>
+			<vaadin-button on-click="_save">Save</vaadin-button>
+			<vaadin-button on-click="_reset">Reset list</vaadin-button>
+		</div>
+		<paper-toast id="toast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class ViewersPage extends Polymer.Element {
+			static get is() { return 'viewers-page'; }
+
+			static get properties() {
+				return {
+
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('config', (event, args) => {
+					this.viewers = args.viewers;
+				});
+			}
+
+			_save() {
+				ipcRenderer.send('viewersConfig', this.viewers);
+				this.message = 'Settings saved';
+				this.$.toast.open();
+			}
+
+			_reset() {
+				ipcRenderer.send('resetViewers', {});
+				this.message = 'List cleared';
+				this.$.toast.open();
+			}
+		}
+
+		window.customElements.define(ViewersPage.is, ViewersPage);
+	</script>
+</dom-module>

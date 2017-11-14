@@ -1,0 +1,50 @@
+<dom-module id="np-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			vaadin-checkbox {
+				margin: 10px;
+			}
+			vaadin-text-field {
+				margin: 0 10px;
+				width: 1000px;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+				width: 160px;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<vaadin-checkbox checked="{{np.enabled}}">Enabled</vaadin-checkbox>
+			<vaadin-text-field label="File path" value="{{np.filePath}}"></vaadin-text-field>
+			<vaadin-button on-click="_save">Save</vaadin-button>
+		</div>
+		<paper-toast id="toast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class NpPage extends Polymer.Element {
+			static get is() { return 'np-page'; }
+
+			static get properties() {
+				return {
+
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('config', (event, args) => {
+					this.np = args.np;
+				})
+			}
+
+			_save() {
+				ipcRenderer.send('npConfig', this.np);
+				this.message = 'Settings saved';
+				this.$.toast.open();
+			}
+		}
+
+		window.customElements.define(NpPage.is, NpPage);
+	</script>
+</dom-module>

@@ -1,0 +1,42 @@
+<dom-module id="requests-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			beatmap-info {
+				margin: 5px;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<template is="dom-repeat" items="[[requests]]" as="beatmap">
+				<beatmap-info accuracy="[[beatmap.accuracy]]" ar="[[beatmap.ar]]" artist="[[beatmap.artist]]" beatmap-id="[[beatmap.beatmapId]]" beatmapset-id="[[beatmap.beatmapsetId]]" bpm="[[beatmap.bpm]]" count-circles="[[beatmap.countCircles]]" count-sliders="[[beatmap.countSliders]]" cover="[[beatmap.cover]]" cs="[[beatmap.cs]]" difficulty-rating="[[beatmap.difficultyRating]]" drain="[[beatmap.drain]]" preview-url="[[beatmap.previewUrl]]" title="[[beatmap.title]]" total-length="[[beatmap.totalLength]]" version="[[beatmap.version]]" mods="[[beatmap.mods]]" requester="[[beatmap.requester]]" sub-badge="[[subBadge]]" sub-tier="[[beatmap.subTier]]" on-done="_done"></beatmap-info>
+			</template>
+		</div>
+	</template>
+	<script>
+		class RequestsPage extends Polymer.Element {
+			static get is() { return 'requests-page'; }
+
+			static get properties() {
+				return {
+
+				}
+			}
+
+			ready() {
+				super.ready();
+				this.requests = [];
+				ipcRenderer.on('newRequest', (event, args) => {
+					this.splice('requests', 0, 0, args);
+				});
+				ipcRenderer.on('subBadge', (event, args) => {
+					this.subBadge = args;
+				});
+			}
+
+			_done(e) {
+				this.splice('requests', e.model.index, 1);
+			}
+		}
+
+		window.customElements.define(RequestsPage.is, RequestsPage);
+	</script>
+</dom-module>

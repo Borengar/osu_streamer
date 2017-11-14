@@ -1,0 +1,90 @@
+<dom-module id="index-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			app-header {
+				background-color: #b17;
+				color: white;
+			}
+			app-drawer-layout {
+				height: 100%;
+			}
+			app-header-layout {
+				height: 100%;
+			}
+			paper-icon-button {
+				color: white;
+			}
+			.drawer-wrapper {
+				height: 100%;
+				overflow: auto;
+			}
+			#requestToast {
+				background-color: green;
+				cursor: pointer;
+			}
+			.wrapper {
+				overflow-y: auto;
+			}
+		</style>
+		<app-drawer-layout force-narrow>
+			<app-drawer slot="drawer">
+				<paper-listbox class="drawer-wrapper" selected="{{pageSelected}}" attr-for-selected="value">
+					<paper-item value="Status">Status</paper-item>
+					<paper-item value="Viewers">Viewers</paper-item>
+					<paper-item value="Requests">Requests</paper-item>
+					<paper-item value="Request Settings">Request Settings</paper-item>
+					<paper-item value="Sub Spam">Sub Spam</paper-item>
+					<paper-item value="Events">Events</paper-item>
+					<paper-item value="Levels">Levels</paper-item>
+					<paper-item value="NP">NP</paper-item>
+				</paper-listbox>
+			</app-drawer>
+			<app-header-layout fullbleed>
+				<app-header slot="header">
+					<app-toolbar>
+						<paper-icon-button icon="menu" drawer-toggle></paper-icon-button>
+						<div main-title>[[pageSelected]]</div>
+						<div class="flex"></div>
+					</app-toolbar>
+				</app-header>
+				<iron-pages class="wrapper flex layout vertical" selected="[[pageSelected]]" attr-for-selected="value">
+					<status-page class="flex layout vertical" value="Status"></status-page>
+					<viewers-page class="flex layout vertical" value="Viewers"></viewers-page>
+					<requests-page class="flex layout vertical" value="Requests"></requests-page>
+					<request-settings class="flex layout vertical" value="Request Settings"></request-settings>
+					<sub-page class="flex layout vertical" value="Sub Spam"></sub-page>
+					<events-page class="flex layout vertical" value="Events"></events-page>
+					<levels-page class="flex layout vertical" value="Levels"></levels-page>
+					<np-page class="flex layout vertical" value="NP"></np-page>
+				</iron-pages>
+			</app-header-layout>
+		</app-drawer-layout>
+		<paper-toast id="requestToast" text="[[requestMessage]]" on-click="_openRequests"></paper-toast>
+	</template>
+	<script>
+		class IndexPage extends Polymer.Element {
+			static get is() { return 'index-page'; }
+
+			static get properties() {
+				return {
+
+				}
+			}
+
+			ready() {
+				super.ready();
+				this.pageSelected = 'Status';
+				ipcRenderer.on('newRequest', (event, args) => {
+					this.requestMessage = 'New Request';
+					this.$.requestToast.open();
+				});
+			}
+
+			_openRequests() {
+				this.pageSelected = 'Requests';
+			}
+		}
+
+		window.customElements.define(IndexPage.is, IndexPage);
+	</script>
+</dom-module>

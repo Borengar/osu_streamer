@@ -1,0 +1,60 @@
+<dom-module id="sub-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			vaadin-checkbox {
+				margin: 10px;
+			}
+			paper-textarea {
+				margin: 0 10px;
+			}
+			.message-example {
+				margin: 10px;
+				color: grey;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+				width: 160px;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<vaadin-checkbox checked="{{spam.enabled}}">Enabled</vaadin-checkbox>
+			<paper-textarea label="Message" value="{{spam.message}}"></paper-textarea>
+			<div class="message-example">[[_messageExample(spam.message, twitchUser)]]</div>
+			<vaadin-button on-click="_save">Save</vaadin-button>
+		</div>
+		<paper-toast id="toast" text="Settings saved"></paper-toast>
+	</template>
+	<script>
+		class SubPage extends Polymer.Element {
+			static get is() { return 'sub-page'; }
+
+			static get properties() {
+				return {
+
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('config', (event, args) => {
+					this.spam = args.spam;
+				});
+				ipcRenderer.on('twitchUser', (event, args) => {
+					this.twitchUser = args;
+				});
+			}
+
+			_save() {
+				ipcRenderer.send('spamConfig', this.spam);
+				this.$.toast.open();
+			}
+
+			_messageExample(message, twitchUser) {
+				return message.replace(/{user}/g, twitchUser);
+			}
+		}
+
+		window.customElements.define(SubPage.is, SubPage);
+	</script>
+</dom-module>

@@ -1,0 +1,94 @@
+<dom-module id="request-settings">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			vaadin-checkbox {
+				margin: 10px;
+			}
+			vaadin-text-field {
+				margin: 0 10px;
+				width: 1000px;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+				width: 160px;
+			}
+			.message-example {
+				margin: 10px;
+				color: grey;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<vaadin-checkbox checked="{{requests.enabled}}">Enabled</vaadin-checkbox>
+			<vaadin-checkbox checked="{{requests.subOnly.enabled}}">Sub only</vaadin-checkbox>
+			<vaadin-checkbox checked="{{requests.subOnly.twitchResponse.enabled}}">Sub only chat response</vaadin-checkbox>
+			<vaadin-text-field label="Twitch chat pleb response text" value="{{requests.subOnly.twitchResponse.message}}"></vaadin-text-field>
+			<div class="message-example">[[_messageExample(requests.subOnly.twitchResponse.message)]]</div>
+			<vaadin-checkbox checked="{{requests.twitchResponse.enabled}}">Twitch chat response</vaadin-checkbox>
+			<vaadin-text-field label="Twitch chat response text" value="{{requests.twitchResponse.message}}"></vaadin-text-field>
+			<div class="message-example">[[_messageExample(requests.twitchResponse.message)]]</div>
+			<vaadin-checkbox checked="{{requests.osuResponse.enabled}}">osu! chat link</vaadin-checkbox>
+			<vaadin-text-field label="osu! ingame link text" value="{{requests.osuResponse.message}}"></vaadin-text-field>
+			<div class="message-example">[[_messageExample(requests.osuResponse.message)]]</div>
+			<vaadin-checkbox checked="{{requests.cooldown.enabled}}">Request cooldown</vaadin-checkbox>
+			<vaadin-checkbox checked="{{requests.cooldown.plebOnly}}">Request cooldown only for plebs</vaadin-checkbox>
+			<vaadin-text-field label="Request cooldown in seconds" value="{{requests.cooldown.seconds}}"></vaadin-text-field>
+			<vaadin-checkbox checked="{{requests.cooldown.twitchResponse.enabled}}">Request on cooldown response</vaadin-checkbox>
+			<vaadin-text-field label="Request on cooldown response text" value="{{requests.cooldown.twitchResponse.message}}"></vaadin-text-field>
+			<div class="message-example">[[_messageExample(requests.cooldown.twitchResponse.message)]]</div>
+			<vaadin-button on-click="_save">Save</vaadin-button>
+		</div>
+		<paper-toast id="toast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class RequestSettings extends Polymer.Element {
+			static get is() { return 'request-settings'; }
+
+			static get properties() {
+				return {
+
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('config', (event, args) => {
+					this.requests = args.requests;
+				});
+			}
+
+			_save() {
+				ipcRenderer.send('requestsConfig', this.requests);
+				this.message = 'Settings saved';
+				this.$.toast.open();
+			}
+
+			_messageExample(message) {
+				message = message.replace(/{accuracy}/g, '8.3');
+				message = message.replace(/{artist}/g, 'yuuyu');
+				message = message.replace(/{ar}/g, '9.3');
+				message = message.replace(/{beatmapId}/g, '1106927');
+				message = message.replace(/{beatmapsetId}/g, '521100');
+				message = message.replace(/{bpm}/g, '200');
+				message = message.replace(/{countCircles}/g, '613');
+				message = message.replace(/{countSliders}/g, '364');
+				message = message.replace(/{cover}/g, 'https://assets.ppy.sh/beatmaps/521100/cover@2x.jpg?1106927');
+				message = message.replace(/{cs}/g, '4.3');
+				message = message.replace(/{difficultyRating}/g, '5.81');
+				message = message.replace(/{drain}/g, '7.3');
+				message = message.replace(/{mods}/g, 'HDHR');
+				message = message.replace(/{pp}/g, '486');
+				message = message.replace(/{previewUrl}/g, '//b.ppy.sh/preview/521100.mp3');
+				message = message.replace(/{requester}/g, 'GVmG');
+				message = message.replace(/{status}/g, 'graveyard');
+				message = message.replace(/{subTier}/g, '1');
+				message = message.replace(/{title}/g, 'Scrap Syndrome');
+				message = message.replace(/{totalLength}/g, '3:18');
+				message = message.replace(/{version}/g, 'Heavy Rain');
+				return message;
+			}
+		}
+
+		window.customElements.define(RequestSettings.is, RequestSettings);
+	</script>
+</dom-module>

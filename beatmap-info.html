@@ -1,0 +1,298 @@
+<dom-module id="beatmap-info">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			.wrapper {
+				width: 1000px;
+				height: 255px;
+				position: relative;
+				color: white;
+				text-shadow: 2px 2px #000000;
+				flex-shrink: 0;
+			}
+			.user {
+				position: absolute;
+				left: 30px;
+				top: 20px;
+				font-size: 17px;
+			}
+			.sub-icon {
+				margin: 0 5px;
+			}
+			.version {
+				position: absolute;
+				left: 30px;
+				top: 60px;
+				font-size: 17px;
+			}
+			.title {
+				position: absolute;
+				left: 30px;
+				top: 80px;
+				font-size: 35px;
+				font-style: italic;
+				font-weight: bold;
+			}
+			.artist {
+				position: absolute;
+				left: 30px;
+				top: 120px;
+				font-size: 20px;
+				font-style: italic;
+			}
+			.preview-box {
+				position: absolute;
+				left: 680px;
+				top: 5px;
+				height: 35px;
+				width: 275px;
+				background: linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5));
+				cursor: pointer;
+			}
+			.preview-icon {
+				position: absolute;
+				left: 805px;
+				top: 10px;
+				width: 25px;
+				height: 25px;
+				cursor: pointer;
+			}
+			.stats-1-box {
+				position: absolute;
+				left: 680px;
+				top: 45px;
+				height: 35px;
+				width: 275px;
+				background: linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5));
+			}
+			.stats-1-images {
+				position: absolute;
+				top: 55px;
+				height: 15px;
+				width: 15px;
+			}
+			.stats-1 {
+				position: absolute;
+				top: 55px;
+				font-size: 12px;
+				color: yellow;
+			}
+			.length-image {
+				left: 695px;
+			}
+			.length {
+				left: 715px;
+			}
+			.bpm-image {
+				left: 760px;
+			}
+			.bpm {
+				left: 780px;
+			}
+			.circle-image {
+				left: 825px;
+			}
+			.circle {
+				left: 845px;
+			}
+			.slider-image {
+				left: 885px;
+			}
+			.slider {
+				left: 905px;
+			}
+			.stats-2-box {
+				position: absolute;
+				left: 680px;
+				top: 85px;
+				height: 115px;
+				width: 275px;
+				background: linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5));
+			}
+			.stats-2-labels {
+				position: absolute;
+				left: 695px;
+				font-size: 12px;
+			}
+			.stats-2-progess {
+				position: absolute;
+				left: 790px;
+				width: 110px;
+			}
+			.stats-2 {
+				position: absolute;
+				left: 920px;
+				font-size: 12px;
+			}
+			.cs-label, .cs-progress, .cs {
+				top: 95px;
+			}
+			.drain-label, .drain-progress, .drain {
+				top: 115px;
+			}
+			.accuracy-label, .accuracy-progress, .accuracy {
+				top: 135px;
+			}
+			.ar-label, .ar-progress, .ar {
+				top: 155px;
+			}
+			.difficulty-rating-label, .difficulty-rating-progress, .difficulty-rating {
+				top: 175px;
+			}
+			paper-progress {
+				margin-top: 6px;
+				--paper-progress-active-color: white;
+				--paper-progress-container-color: grey;
+			}
+			.difficulty-rating-progress {
+				--paper-progress-active-color: yellow;
+			}
+			.download {
+				position: absolute;
+				left: 690px;
+				top: 200px;
+				cursor: pointer;
+				width: 125px;
+				height: 53px;
+			}
+			.direct {
+				position: absolute;
+				left: 690px;
+				top: 200px;
+				cursor: pointer;
+				width: 125px;
+				height: 53px;
+			}
+			.done {
+				position: absolute;
+				left: 820px;
+				top: 200px;
+				cursor: pointer;
+				width: 125px;
+				height: 53px;
+			}
+			.mod-wrapper {
+				position: absolute;
+				left: 30px;
+				top: 150px;
+			}
+			.mod {
+				width: 90px;
+				height: 87px;
+				margin: 0 5px;
+			}
+		</style>
+		<div class="wrapper layout horizontal" style="background:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('[[cover]]') no-repeat center center;">
+			<div class="user layout horizontal">
+				<div>Requested by [[requester]]</div>
+				<template is="dom-if" if="[[_isSub(subTier)]]">
+					<img class="sub-icon" src="[[subBadge]]">
+					<div>[[subTier]]</div>
+				</template>
+			</div>
+			<div class="version">[[version]]</div>
+			<div class="title">[[title]]</div>
+			<div class="artist">[[artist]]</div>
+			<div class="preview-box" on-click="_togglePreview"></div>
+			<iron-icon class="preview-icon" icon="[[previewIcon]]" on-click="_togglePreview"></iron-icon>
+			<audio id="preview" on-ended="_previewEnded" src="[[previewUrl]]"></audio>
+			<div class="stats-1-box"></div>
+			<img class="length-image stats-1-images" src="https://osu.ppy.sh/images/layout/beatmapset-page/total_length.svg" title="Length">
+			<div class="length stats-1" title="Length">[[_convertLength(totalLength)]]</div>
+			<img class="bpm-image stats-1-images" src="https://osu.ppy.sh/images/layout/beatmapset-page/bpm.svg" title="BPM">
+			<div class="bpm stats-1" title="BPM">[[bpm]]</div>
+			<img class="circle-image stats-1-images" src="https://osu.ppy.sh/images/layout/beatmapset-page/count_circles.svg" title="Circle Count">
+			<div class="circle stats-1" title="Circle Count">[[countCircles]]</div>
+			<img class="slider-image stats-1-images" src="https://osu.ppy.sh/images/layout/beatmapset-page/count_sliders.svg" title="Slider Count">
+			<div class="slider stats-1" title="Slider Count">[[countSliders]]</div>
+			<div class="stats-2-box"></div>
+			<div class="cs-label stats-2-labels">Circle Size</div>
+			<paper-progress class="cs-progress stats-2-progess" value="[[cs]]" max="10"></paper-progress>
+			<div class="cs stats-2">[[cs]]</div>
+			<div class="drain-label stats-2-labels">HP Drain</div>
+			<paper-progress class="drain-progress stats-2-progess" value="[[drain]]" max="10"></paper-progress>
+			<div class="drain stats-2">[[drain]]</div>
+			<div class="accuracy-label stats-2-labels">Accuracy</div>
+			<paper-progress class="accuracy-progress stats-2-progess" value="[[accuracy]]" max="10"></paper-progress>
+			<div class="accuracy stats-2">[[accuracy]]</div>
+			<div class="ar-label stats-2-labels">Approach Rate</div>
+			<paper-progress class="ar-progress stats-2-progess" value="[[ar]]" max="10"></paper-progress>
+			<div class="ar stats-2">[[ar]]</div>
+			<div class="difficulty-rating-label stats-2-labels">Star Difficulty</div>
+			<paper-progress class="difficulty-rating-progress stats-2-progess" value="[[difficultyRating]]" max="10"></paper-progress>
+			<div class="difficulty-rating stats-2">[[difficultyRating]]</div>
+			<a href="osu://dl/[[beatmapsetId]]"><img class="direct" src="images/direct.png"></a>
+			<img class="done" src="images/done.png" on-click="_done">
+			<div class="mod-wrapper layout horizontal">
+				<template is="dom-repeat" items="[[mods]]" as="mod">
+					<img class="mod" src="images/mod-[[mod]].png">
+				</template>
+			</div>
+		</div>
+	</template>
+	<script>
+		class BeatmapInfo extends Polymer.Element {
+			static get is() { return 'beatmap-info' }
+
+			static get properties() {
+				return {
+					accuracy: Number,
+					ar: Number,
+					artist: String,
+					beatmapId: Number,
+					beatmapsetId: Number,
+					bpm: Number,
+					countCircles: Number,
+					countSliders: Number,
+					cover: String,
+					cs: Number,
+					difficultyRating: Number,
+					drain: Number,
+					previewUrl: String,
+					title: String,
+					totalLength: Number,
+					version: String,
+					previewIcon: {
+						type: String,
+						value: 'av:play-arrow'
+					},
+					previewPlaying: {
+						type: Boolean,
+						value: false
+					},
+					mods: Array,
+					requester: String,
+					subTier: String
+				}
+			}
+
+			_convertLength(length) {
+				var minutes = Math.floor(length / 60);
+				var seconds = length % 60;
+				return minutes + ':' + ('00' + seconds).slice(-2);
+			}
+
+			_togglePreview() {
+				if (this.previewPlaying) {
+					this.previewIcon = 'av:play-arrow';
+					this.$.preview.pause();
+					this.previewPlaying = false;
+				} else {
+					this.previewIcon = 'av:stop';
+					this.$.preview.currentTime = 0;
+					this.$.preview.play();
+					this.previewPlaying = true;
+				}
+			}
+
+			_isSub(subTier) {
+				return subTier != 'Pleb';
+			}
+
+			_done() {
+				this.dispatchEvent(new CustomEvent('done', {bubbles: true, composed: true}));
+			}
+		}
+
+		window.customElements.define(BeatmapInfo.is, BeatmapInfo);
+	</script>
+</dom-module>

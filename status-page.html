@@ -1,0 +1,117 @@
+<dom-module id="status-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			.twitch-logo, .osu-logo {
+				margin: 40px auto;
+				width: 200px;
+			}
+			.twitch-heading {
+				margin: 0 auto;
+				color: #6441a4;
+				font-size: 30px;
+			}
+			.osu-heading {
+				margin: 0 auto;
+				color: #b17;
+				font-size: 30px;
+			}
+			.status-wrapper {
+				margin: 10px auto;
+			}
+			.twitch-status, .osu-status {
+				margin-left: 10px;
+				font-size: 20px;
+			}
+			.osu-login-wrapper {
+				margin: 0 auto;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+			}
+		</style>
+		<div class="flex layout horizontal">
+			<div class="flex layout vertical">
+				<img class="twitch-logo" src="images/twitch_logo.png">
+				<div class="twitch-heading">TwitchTV Chat</div>
+				<div class="status-wrapper layout horizontal">
+					<div style="background-color:[[_convertStatus(twitchStatus)]];border-radius:100%;width:26px;height:26px;"></div>
+					<div class="twitch-status">[[twitchStatus]]</div>
+				</div>
+			</div>
+			<div class="flex layout vertical">
+				<img class="osu-logo" src="images/osu_logo.png">
+				<div class="osu-heading">osu! IRC</div>
+				<div class="status-wrapper layout horizontal">
+					<div style="background-color:[[_convertStatus(osuStatus)]];border-radius:100%;width:26px;height:26px;"></div>
+					<div class="osu-status">[[osuStatus]]</div>
+				</div>
+				<div class="osu-login-wrapper layout vertical">
+					<vaadin-text-field label="Username" value="{{osu.username}}" disabled="[[_osuConnected(osuStatus)]]"></vaadin-text-field>
+					<vaadin-password-field label="Password" value="{{osu.password}}" disabled="[[_osuConnected(osuStatus)]]"></vaadin-password-field>
+					<template is="dom-if" if="[[!_osuConnected(osuStatus)]]">
+						<vaadin-button on-click="_osuLogin">Connect</vaadin-button>
+					</template>
+					<template is="dom-if" if="[[_osuConnected(osuStatus)]]">
+						<vaadin-button on-click="_osuLogout">Disconnect</vaadin-button>
+					</template>
+				</div>
+			</div>
+		</div>
+	</template>
+	<script>
+		class StatusPage extends Polymer.Element {
+			static get is() { return 'status-page'; }
+
+			static get properties() {
+				return {
+					twitchStatus: {
+						type: String,
+						value: 'Disconnected'
+					},
+					osuStatus: {
+						type: String,
+						value: 'Disconnected'
+					}
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('twitchStatus', (event, args) => {
+					this.twitchStatus = args;
+				});
+				ipcRenderer.on('osuStatus', (event, args) => {
+					this.osuStatus = args;
+				});
+				ipcRenderer.on('config', (event, args) => {
+					this.osu = args.osu;
+				});
+			}
+
+			_convertStatus(status) {
+				switch (status) {
+					case 'Disconnected': return 'red'; break;
+					case 'Wrong username or password': return 'red'; break;
+					case 'Connecting': return 'yellow'; break;
+					case 'Connected': return 'green'; break;
+				}
+				return 'black';
+			}
+
+			_osuConnected(status) {
+				return status == 'Connected' || status == 'Connecting';
+			}
+
+			_osuLogin() {
+				ipcRenderer.send('osuLogin', this.osu);
+			}
+
+			_osuLogout() {
+				ipcRenderer.send('osuLogout', {});
+			}
+		}
+
+		window.customElements.define(StatusPage.is, StatusPage);
+	</script>
+</dom-module>
