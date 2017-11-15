@@ -5,7 +5,7 @@ const url = require('url');
 const fs = require('fs');
 const tmi = require('tmi.js');
 const https = require('https');
-const request = require('request');
+const request = require('request-promise');
 const irc = require('irc');
 const cheerio = require('cheerio');
 const clientId = 'vf3g964qvdzd6905rdg5wyecwvlz9u';
@@ -65,29 +65,35 @@ function createWindow() {
 	    			'Client-ID': clientId,
 	    			'Authorization': 'OAuth ' + accessToken
 	    		}
-	    	}, (error, response, body) => {
+	    	})
+	    	.then((body) => {
 	    		user = JSON.parse(body);
-	    		request('https://badges.twitch.tv/v1/badges/channels/' + user._id + '/display?language=en', (error, response, body) => {
-						badges = JSON.parse(body);
-						if (badges.badge_sets.subscriber) {
-							mainWindow.webContents.send('subBadge', badges.badge_sets.subscriber.versions['0'].image_url_1x);
-						}
-					});
-					request({
+	    		return request('https://badges.twitch.tv/v1/badges/channels/' + user._id + '/display?language=en');
+	    	})
+	    	.then((body) => {
+					badges = JSON.parse(body);
+					if (badges.badge_sets.subscriber) {
+						mainWindow.webContents.send('subBadge', badges.badge_sets.subscriber.versions['0'].image_url_1x);
+					}
+					return request({
 						url: 'https://api.twitch.tv/kraken/channels/' + user._id,
 						headers: {
 							'Accept': 'application/vnd.twitchtv.v5+json',
 							'Client-ID': clientId,
 							'Authorization': 'OAuth ' + accessToken
 						}
-					}, (error, response, body) => {
-						channel = JSON.parse(body);
-
-						// debugging
-						//channel.name = 'happystick';
-
-						twitchLogin();
 					});
+				})
+				.then((body) => {
+					channel = JSON.parse(body);
+
+					// debugging
+					//channel.name = 'happystick';
+
+					twitchLogin();
+				})
+	    	.catch((err) => {
+	    		console.error(err);
 	    	});
     	});
     	mainWindow.loadURL(url.format({
@@ -191,50 +197,10 @@ function twitchLogin() {
 			}
 			if (config.requests.enabled) {
 				if (message.includes('osu.ppy.sh')) {
-					request({
-						url: 'https://api.twitch.tv/kraken/channels/' + channel._id + '/subscriptions/' + userstate['user-id'],
-		    		headers: {
-		    			'Accept': 'application/vnd.twitchtv.v5+json',
-		    			'Client-ID': clientId,
-		    			'Authorization': 'OAuth ' + accessToken
-		    		},
-		    		gzip: true
-					}, (error, response, body) => {
-						subscription = JSON.parse(body);
-						if (subscription && subscription['_id']) {
-							switch (subscription.sub_plan) {
-								case '1000': subTier = 'Tier 1'; break;
-								case '2000': subTier = 'Tier 2'; break;
-								case '3000': subTier = 'Tier 3'; break;
-								default: subTier = '?';
-							}
-						} else {
-							subTier = 'Pleb';
-						}
-
-						beatmapId = null;
-						beatmapsetId = null;
-						var regexp = new RegExp('https?://osu.ppy.sh/b/[0-9]+.*');
-						if (regexp.test(message)) {
-							var regexp = /b\/[0-9]+/g
-							var match = regexp.exec(message);
-							beatmapId = match[0].substring(2);
-						} else {
-							var regexp = new RegExp('https?://osu.ppy.sh/s/[0-9]+.*');
-							if (regexp.test(message)) {
-								var regexp = /s\/[0-9]+/g
-								var match = regexp.exec(message);
-								beatmapsetId = match[0].substring(2);
-							} else {
-								var regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+#osu/[0-9]+.*');
-								if (regexp.test(message)) {
-									var regexp = /#osu\/[0-9]+/g
-									var match = regexp.exec(message);
-									beatmapId = match[0].substring(5);
-								}
-							}
-						}
-						if (beatmapId || beatmapsetId) {
+					let subTier = getUserSubTier(userstate['user-id']);
+					let beatmapId = getBeatmapIdFromMessage(message)
+					.then((beatmapId) => {
+						if (beatmapId) {
 							if (config.requests.subOnly.enabled && subTier == 'Pleb') {
 								if (config.requests.subOnly.twitchResponse.enabled && !subOnlyOnCooldown) {
 									let chatMessage = config.requests.subOnly.twitchResponse.message;
@@ -263,25 +229,9 @@ function twitchLogin() {
 									if (message.includes('DT')) {
 										mods.push('DT');
 									}
-									if (beatmapId) {
-										requestBeatmap(beatmapId, mods, username, subTier);
-									} else if (beatmapsetId) {
-										request('https://osu.ppy.sh/beatmapsets/' + beatmapsetId, (error, response, body) => {
-											let $ = cheerio.load(body);
-											let beatmapset = JSON.parse($('#json-beatmapset').html());
-											let beatmapId = null;
-											let highestStar = 0;
-											for (var i = 0; i < beatmapset.beatmaps.length; i++) {
-												if (beatmapset.beatmaps[i].difficulty_rating > highestStar) {
-													beatmapId = beatmapset.beatmaps[i].id;
-													highestStar = beatmapset.beatmaps[i].difficulty_rating;
-												}
-											}
-											if (beatmapId) {
-												requestBeatmap(beatmapId, mods, username, subTier)
-											}
-										});
-									}
+
+									requestBeatmap(beatmapId, mods, username, subTier);
+
 									if (config.requests.cooldown.enabled && (!config.requests.cooldown.plebOnly || (config.requests.cooldown.plebOnly && subTier == 'Pleb'))) {
 										requestCooldowns.push(username);
 										setTimeout(() => {
@@ -291,6 +241,9 @@ function twitchLogin() {
 								}
 							}
 						}
+					})
+					.catch((err) => {
+						// no beatmap link found in message
 					});
 				}
 			}
@@ -299,21 +252,18 @@ function twitchLogin() {
 					return item.userId == userstate['user-id'];
 				});
 				if (!userObject) {
-					request('https://mikuia.tv/api/user/' + userstate['username'] + '/levels/' + channel.name.toLowerCase(), (error, response, body) => {
+					request('https://mikuia.tv/api/user/' + userstate['username'] + '/levels/' + channel.name.toLowerCase())
+					.then((body) => {
 						exp = 0;
 						level = 0;
-						if (error) {
-							console.log(error);
-						} else {
-							try {
-								let levelData = JSON.parse(body);
-								if (levelData.experience) {
-									exp = levelData.experience;
-									level = Math.floor(0.125 * (Math.sqrt(4 * exp + 689) - 25));
-								}
-							} catch(e) {
-								// user or channel probably not found
+						try {
+							let levelData = JSON.parse(body);
+							if (levelData.experience) {
+								exp = levelData.experience;
+								level = Math.floor(0.125 * (Math.sqrt(4 * exp + 689) - 25));
 							}
+						} catch(err) {
+							// user or channel probably not found
 						}
 						levels.push({
 							userId: userstate['user-id'],
@@ -322,6 +272,9 @@ function twitchLogin() {
 							level: level,
 							activity: 5
 						});
+					})
+					.catch((err) => {
+						console.error(err);
 					});
 				} else {
 					userObject.activity = 5;
@@ -337,7 +290,8 @@ function twitchLogin() {
 		});
 		twitchMessageTimer = setInterval(() => {
 			if (twitchMessageQueue.length > 0 && twitchClient && twitchClient.readyState() == 'OPEN') {
-				twitchClient.action(channel.name.toLowerCase(), twitchMessageQueue.shift()).then((data) => {
+				twitchClient.action(channel.name.toLowerCase(), twitchMessageQueue.shift())
+				.then((data) => {
 					// everything is ok
 				}).catch((err) => {
 					console.log(err);
@@ -349,55 +303,57 @@ function twitchLogin() {
 }
 
 function requestBeatmap(beatmapId, mods, username, subTier) {
-	request('https://osu.ppy.sh/beatmaps/' + beatmapId, (error, response, body) => {
-		let $ = cheerio.load(body);
+	Promise.all([request('https://osu.ppy.sh/beatmaps/' + beatmapId), request('https://osu.ppy.sh/osu/' + beatmapId)])
+	.then(([mapData, mapFile]) => {
+		let $ = cheerio.load(mapData);
 		let beatmapset = JSON.parse($('#json-beatmapset').html());
 		let beatmapData = beatmapset.beatmaps.find((item) => {
 			return item.id == beatmapId;
 		});
-		request('https://osu.ppy.sh/osu/' + beatmapId, (error, response, body) => {
-			fs.writeFile('oppai/' + beatmapId + '.osu', body, (err) => {
-				execFile('oppai/oppai', ['oppai/' + beatmapId + '.osu', '+' + mods.join(''), '-ojson'], (err, data) => {
-					if (err) {
-						throw(err);
-					}
-					data = JSON.parse(data);
-					let beatmap = {
-						accuracy: data.od.toFixed(1),
-						ar: data.ar,
-						artist: beatmapset.artist,
-						beatmapId: beatmapId,
-						beatmapsetId: beatmapset.id,
-						bpm: mods.includes('DT') ? beatmapset.bpm * 1.5 : beatmapset.bpm,
-						countCircles: beatmapData.count_circles,
-						countSliders: beatmapData.count_sliders,
-						cover: beatmapset.covers['cover@2x'],
-						cs: data.cs.toFixed(1),
-						difficultyRating: data.stars.toFixed(2),
-						drain: data.hp.toFixed(1),
-						previewUrl: beatmapset.preview_url,
-						title: beatmapset.title,
-						totalLength: beatmapData.total_length * 2/3,
-						status: beatmapset.status,
-						version: beatmapData.version,
-						mods: mods,
-						requester: username,
-						subTier: subTier,
-						pp: data.pp.toFixed(2)
-					}
-					mainWindow.webContents.send('newRequest', beatmap);
-					let chatMessage = config.requests.twitchResponse.message;
-					if (config.requests.twitchResponse.enabled) {
-						chatMessage = messageReplace(config.requests.twitchResponse.message, beatmap);
-						twitchMessageQueue.push(chatMessage);
-					}
-					if (config.requests.osuResponse.enabled && osuClient) {
-						chatMessage = messageReplace(config.requests.osuResponse.message, beatmap);
-						osuClient.say(config.osu.username, chatMessage);
-					}
-				});
+		fs.writeFile('oppai/' + beatmapId + '.osu', mapFile, (err) => {
+			execFile('oppai/oppai', ['oppai/' + beatmapId + '.osu', '+' + mods.join(''), '-ojson'], (err, data) => {
+				if (err) {
+					throw(err);
+				}
+				data = JSON.parse(data);
+				let beatmap = {
+					accuracy: data.od.toFixed(1),
+					ar: data.ar,
+					artist: beatmapset.artist,
+					beatmapId: beatmapId,
+					beatmapsetId: beatmapset.id,
+					bpm: mods.includes('DT') ? beatmapset.bpm * 1.5 : beatmapset.bpm,
+					countCircles: beatmapData.count_circles,
+					countSliders: beatmapData.count_sliders,
+					cover: beatmapset.covers['cover@2x'],
+					cs: data.cs.toFixed(1),
+					difficultyRating: data.stars.toFixed(2),
+					drain: data.hp.toFixed(1),
+					previewUrl: beatmapset.preview_url,
+					title: beatmapset.title,
+					totalLength: beatmapData.total_length * 2/3,
+					status: beatmapset.status,
+					version: beatmapData.version,
+					mods: mods,
+					requester: username,
+					subTier: subTier,
+					pp: data.pp.toFixed(2)
+				}
+				mainWindow.webContents.send('newRequest', beatmap);
+				let chatMessage = config.requests.twitchResponse.message;
+				if (config.requests.twitchResponse.enabled) {
+					chatMessage = messageReplace(config.requests.twitchResponse.message, beatmap);
+					twitchMessageQueue.push(chatMessage);
+				}
+				if (config.requests.osuResponse.enabled && osuClient) {
+					chatMessage = messageReplace(config.requests.osuResponse.message, beatmap);
+					osuClient.say(config.osu.username, chatMessage);
+				}
 			});
 		});
+	})
+	.catch((err) => {
+		console.error(err);
 	});
 }
 
@@ -550,7 +506,8 @@ function loadConfig() {
 	eventTimer = setInterval(() => {
 		if (config.osu.username) {
 			if (config.events.rank.enabled || config.events.pp.enabled || config.events.topRanks.enabled) {
-				request('https://osu.ppy.sh/users/' + config.osu.username, (error, response, body) => {
+				request('https://osu.ppy.sh/users/' + config.osu.username)
+				.then((body) => {
 					let $ = cheerio.load(body);
 					let userData = JSON.parse($('#json-user').html());
 					let statisticsData = JSON.parse($('#json-statistics').html());
@@ -584,6 +541,9 @@ function loadConfig() {
 						config.events.topRanks.last = userData.recentActivities[0].id;
 					}
 					saveConfig();
+				})
+				.catch((err) => {
+					console.error(err);
 				});
 			}
 		}
@@ -648,6 +608,78 @@ function saveLevels() {
 		});
 	});
 	fs.writeFile(app.getPath('userData') + '\\levels.json', JSON.stringify(levels, null, 2), (err) => {});
+}
+
+function getUserSubTier(userId) {
+	let subscription;
+	let subTier = 'Pleb';
+	request({
+		url: 'https://api.twitch.tv/kraken/channels/' + channel._id + '/subscriptions/' + userId,
+		headers: {
+			'Accept': 'application/vnd.twitchtv.v5+json',
+			'Client-ID': clientId,
+			'Authorization': 'OAuth ' + accessToken
+		},
+		gzip: true
+	})
+	.then((body) => {
+		subscription = JSON.parse(body);
+		if (subscription && subscription['_id']) {
+			switch (subscription.sub_plan) {
+				case '1000': subTier = 'Tier 1'; break;
+				case '2000': subTier = 'Tier 2'; break;
+				case '3000': subTier = 'Tier 3'; break;
+				default: subTier = '?';
+			}
+		}
+	})
+	.catch((err) => {
+		// channel probably doesn't have a sub program
+	});
+	return subTier;
+}
+
+function getBeatmapIdFromMessage(message) {
+	let regexp = new RegExp('https?://osu.ppy.sh/b/[0-9]+.*');
+	let match;
+	if (regexp.test(message)) {
+		regexp = /b\/[0-9]+/g
+		match = regexp.exec(message);
+		return Promise.resolve(match[0].substring(2));
+	}
+
+	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+#osu/[0-9]+.*');
+	if (regexp.test(message)) {
+		regexp = /#osu\/[0-9]+/g
+		match = regexp.exec(message);
+		return Promise.resolve(match[0].substring(5));
+	}
+
+	regexp = new RegExp('https?://osu.ppy.sh/s/[0-9]+.*');
+	if (!regexp.test(message)) {
+		return Promise.reject('No beatmap link found');
+	}
+	regexp = /s\/[0-9]+/g
+	match = regexp.exec(message);
+	let beatmapsetId = match[0].substring(2);
+
+	return request('https://osu.ppy.sh/beatmapsets/' + beatmapsetId)
+	.then((body) => {
+		let $ = cheerio.load(body);
+		let beatmapset = JSON.parse($('#json-beatmapset').html());
+		let highestStar = 0;
+		let beatmapId;
+		for (var i = 0; i < beatmapset.beatmaps.length; i++) {
+			if (beatmapset.beatmaps[i].difficulty_rating > highestStar) {
+				beatmapId = beatmapset.beatmaps[i].id;
+				highestStar = beatmapset.beatmaps[i].difficulty_rating;
+			}
+		}
+		return Promise.resolve(beatmapId);
+	})
+	.catch((err) => {
+		console.error(err);
+	});
 }
 
 ipcMain.on('osuLogin', (event, args) => {
