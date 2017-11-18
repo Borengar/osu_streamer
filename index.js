@@ -117,15 +117,19 @@ function deleteViewerFiles(callback) {
 			fileFound = false;
 		}
 	}
+	if (fs.existsSync(config.viewers.filePath + '_all.txt')) {
+		fs.unlinkSync(config.viewers.filePath + '_all.txt');
+	}
 	if (callback) {
 		callback();
 	}
 }
 
 function createViewerFiles() {
-	for (var i = 0; i < Math.ceil(viewers.length / config.viewers.viewersPerFile); i++) {
+	for (var i = 0; i < Math.ceil(viewers.length / config.viewers.viewersPerFile) && i < config.viewers.numberOfFiles; i++) {
 		fs.writeFile(config.viewers.filePath + i + '.txt', viewers.slice(i * config.viewers.viewersPerFile, (i + 1) * config.viewers.viewersPerFile).join('\r\n'), (err) => {});
 	}
+	fs.writeFile(config.viewers.filePath + '_all.txt', viewers.slice(0, config.viewers.viewersPerFile * config.viewers.numberOfFiles).join('\r\n'), (err) => {});
 }
 
 function osuLogin() {
@@ -197,52 +201,50 @@ function twitchLogin() {
 			if (config.viewers.enabled) {
 				if (!viewers.includes(username)) {
 					viewers.push(username);
+					mainWindow.webContents.send('viewers', viewers);
 					createViewerFiles();
 				}
 			}
 			if (config.requests.enabled) {
 				if (message.includes('osu.ppy.sh')) {
-					let subTier = getUserSubTier(userstate['user-id']);
-					let beatmapId = getBeatmapIdFromMessage(message)
-					.then((beatmapId) => {
-						if (beatmapId) {
-							if (config.requests.subOnly.enabled && subTier == 'Pleb') {
-								if (config.requests.subOnly.twitchResponse.enabled && !subOnlyOnCooldown) {
-									let chatMessage = config.requests.subOnly.twitchResponse.message;
+					Promise.all([getBeatmapIdFromMessage(message), getUserSubTier(userstate['user-id'])])
+					.then(([beatmapId, subTier]) => {
+						if (config.requests.subOnly.enabled && subTier == 'Pleb') {
+							if (config.requests.subOnly.twitchResponse.enabled && !subOnlyOnCooldown) {
+								let chatMessage = config.requests.subOnly.twitchResponse.message;
+								chatMessage = chatMessage.replace(/{requester}/g, username);
+								twitchMessageQueue.push(chatMessage);
+								subOnlyOnCooldown = true;
+								setTimeout(() => {
+									subOnlyOnCooldown = false;
+								}, 30000);
+							}
+						} else {
+							if (config.requests.cooldown.enabled && requestCooldowns.includes(username)) {
+								if (config.requests.cooldown.twitchResponse.enabled) {
+									let chatMessage = config.requests.cooldown.twitchResponse.message;
 									chatMessage = chatMessage.replace(/{requester}/g, username);
 									twitchMessageQueue.push(chatMessage);
-									subOnlyOnCooldown = true;
-									setTimeout(() => {
-										subOnlyOnCooldown = false;
-									}, 30000);
 								}
 							} else {
-								if (config.requests.cooldown.enabled && requestCooldowns.includes(username)) {
-									if (config.requests.cooldown.twitchResponse.enabled) {
-										let chatMessage = config.requests.cooldown.twitchResponse.message;
-										chatMessage = chatMessage.replace(/{requester}/g, username);
-										twitchMessageQueue.push(chatMessage);
-									}
-								} else {
-									let mods = [];
-									if (message.includes('HD')) {
-										mods.push('HD');
-									}
-									if (message.includes('HR')) {
-										mods.push('HR');
-									}
-									if (message.includes('DT')) {
-										mods.push('DT');
-									}
+								let mods = [];
+								if (message.includes('HD')) {
+									mods.push('HD');
+								}
+								if (message.includes('HR')) {
+									mods.push('HR');
+								}
+								if (message.includes('DT')) {
+									mods.push('DT');
+								}
 
-									requestBeatmap(beatmapId, mods, username, subTier);
+								requestBeatmap(beatmapId, mods, username, subTier);
 
-									if (config.requests.cooldown.enabled && (!config.requests.cooldown.plebOnly || (config.requests.cooldown.plebOnly && subTier == 'Pleb'))) {
-										requestCooldowns.push(username);
-										setTimeout(() => {
-											requestCooldowns.splice(requestCooldowns.indexOf(username), 1);
-										}, config.requests.cooldown.seconds * 1000);
-									}
+								if (config.requests.cooldown.enabled && (!config.requests.cooldown.plebOnly || (config.requests.cooldown.plebOnly && subTier == 'Pleb'))) {
+									requestCooldowns.push(username);
+									setTimeout(() => {
+										requestCooldowns.splice(requestCooldowns.indexOf(username), 1);
+									}, config.requests.cooldown.seconds * 1000);
 								}
 							}
 						}
@@ -308,58 +310,69 @@ function twitchLogin() {
 }
 
 function requestBeatmap(beatmapId, mods, username, subTier) {
-	Promise.all([request('https://osu.ppy.sh/beatmaps/' + beatmapId), request('https://osu.ppy.sh/osu/' + beatmapId)])
-	.then(([mapData, mapFile]) => {
-		let $ = cheerio.load(mapData);
-		let beatmapset = JSON.parse($('#json-beatmapset').html());
-		let beatmapData = beatmapset.beatmaps.find((item) => {
-			return item.id == beatmapId;
-		});
-		fs.writeFile('oppai/' + beatmapId + '.osu', mapFile, (err) => {
-			execFile('oppai/oppai', ['oppai/' + beatmapId + '.osu', '+' + mods.join(''), '-ojson'], (err, data) => {
-				if (err) {
-					throw(err);
-				}
-				data = JSON.parse(data);
-				let beatmap = {
-					accuracy: data.od.toFixed(1),
-					ar: data.ar,
-					artist: beatmapset.artist,
-					beatmapId: beatmapId,
-					beatmapsetId: beatmapset.id,
-					bpm: mods.includes('DT') ? beatmapset.bpm * 1.5 : beatmapset.bpm,
-					countCircles: beatmapData.count_circles,
-					countSliders: beatmapData.count_sliders,
-					cover: beatmapset.covers['cover@2x'],
-					cs: data.cs.toFixed(1),
-					difficultyRating: data.stars.toFixed(2),
-					drain: data.hp.toFixed(1),
-					previewUrl: beatmapset.preview_url,
-					title: beatmapset.title,
-					totalLength: beatmapData.total_length * 2/3,
-					status: beatmapset.status,
-					version: beatmapData.version,
-					mods: mods,
-					requester: username,
-					subTier: subTier,
-					pp: data.pp.toFixed(2)
-				}
-				mainWindow.webContents.send('newRequest', beatmap);
-				let chatMessage = config.requests.twitchResponse.message;
-				if (config.requests.twitchResponse.enabled) {
-					chatMessage = messageReplace(config.requests.twitchResponse.message, beatmap);
-					twitchMessageQueue.push(chatMessage);
-				}
-				if (config.requests.osuResponse.enabled && osuClient) {
-					chatMessage = messageReplace(config.requests.osuResponse.message, beatmap);
-					osuClient.say(config.osu.username, chatMessage);
-				}
+	console.log('test');
+	if (config.requests.noDuplicates.enabled && requests.some((beatmap) => {
+		return beatmap.beatmapId == beatmapId;
+	})) {
+		if (config.requests.noDuplicates.twitchResponse.enabled) {
+			let chatMessage = config.requests.noDuplicates.twitchResponse.message.replace(/{requester}/g, username);
+			twitchMessageQueue.push(chatMessage);
+		}
+	} else {
+		Promise.all([request('https://osu.ppy.sh/beatmaps/' + beatmapId), request('https://osu.ppy.sh/osu/' + beatmapId)])
+		.then(([mapData, mapFile]) => {
+			let $ = cheerio.load(mapData);
+			let beatmapset = JSON.parse($('#json-beatmapset').html());
+			let beatmapData = beatmapset.beatmaps.find((item) => {
+				return item.id == beatmapId;
 			});
+			fs.writeFile('oppai/' + beatmapId + '.osu', mapFile, (err) => {
+				execFile('oppai/oppai', ['oppai/' + beatmapId + '.osu', '+' + mods.join(''), '-ojson'], (err, data) => {
+					if (err) {
+						throw(err);
+					}
+					data = JSON.parse(data);
+					let beatmap = {
+						accuracy: data.od.toFixed(1),
+						ar: data.ar,
+						artist: beatmapset.artist,
+						beatmapId: beatmapId,
+						beatmapsetId: beatmapset.id,
+						bpm: mods.includes('DT') ? beatmapset.bpm * 1.5 : beatmapset.bpm,
+						countCircles: beatmapData.count_circles,
+						countSliders: beatmapData.count_sliders,
+						cover: beatmapset.covers['cover@2x'],
+						cs: data.cs.toFixed(1),
+						difficultyRating: data.stars.toFixed(2),
+						drain: data.hp.toFixed(1),
+						previewUrl: beatmapset.preview_url,
+						title: beatmapset.title,
+						totalLength: beatmapData.total_length * 2/3,
+						status: beatmapset.status,
+						version: beatmapData.version,
+						mods: mods,
+						requester: username,
+						subTier: subTier,
+						pp: data.pp.toFixed(2)
+					}
+					mainWindow.webContents.send('newRequest', beatmap);
+					requests.push(beatmap);
+					let chatMessage = config.requests.twitchResponse.message;
+					if (config.requests.twitchResponse.enabled) {
+						chatMessage = messageReplace(config.requests.twitchResponse.message, beatmap);
+						twitchMessageQueue.push(chatMessage);
+					}
+					if (config.requests.osuResponse.enabled && osuClient) {
+						chatMessage = messageReplace(config.requests.osuResponse.message, beatmap);
+						osuClient.say(config.osu.username, chatMessage);
+					}
+				});
+			});
+		})
+		.catch((err) => {
+			console.error(err);
 		});
-	})
-	.catch((err) => {
-		console.error(err);
-	});
+	}
 }
 
 function messageReplace(message, values) {
@@ -404,7 +417,8 @@ function loadConfig() {
 			viewers: {
 				enabled: true,
 				filePath: 'viewers',
-				viewersPerFile: 10
+				viewersPerFile: 6,
+				numberOfFiles: 4
 			},
 			requests: {
 				enabled: true,
@@ -430,6 +444,13 @@ function loadConfig() {
 					twitchResponse: {
 						enabled: false,
 						message: '{requester} you recently requested a map. Please wait until you request again'
+					}
+				},
+				noDuplicates: {
+					enabled: true,
+					twitchResponse: {
+						enabled: true,
+						message: '{requester} this map already got requested'
 					}
 				}
 			},
@@ -495,6 +516,18 @@ function loadConfig() {
 			config.np = {
 				enabled: true,
 				filePath: 'np'
+			}
+		}
+		if (!config.viewers.hasOwnProperty('numberOfFiles')) {
+			config.viewers.numberOfFiles = 4
+		}
+		if (!config.requests.hasOwnProperty('noDuplicates')) {
+			config.requests.noDuplicates = {
+				enabled: true,
+				twitchResponse: {
+					enabled: true,
+					message: '{requester} this map already got requested'
+				}
 			}
 		}
 		saveConfig();
@@ -616,8 +649,6 @@ function saveLevels() {
 }
 
 function getUserSubTier(userId) {
-	let subscription;
-	let subTier = 'Pleb';
 	request({
 		url: 'https://api.twitch.tv/kraken/channels/' + channel._id + '/subscriptions/' + userId,
 		headers: {
@@ -628,7 +659,8 @@ function getUserSubTier(userId) {
 		gzip: true
 	})
 	.then((body) => {
-		subscription = JSON.parse(body);
+		let subTier = 'Pleb';
+		let subscription = JSON.parse(body);
 		if (subscription && subscription['_id']) {
 			switch (subscription.sub_plan) {
 				case '1000': subTier = 'Tier 1'; break;
@@ -637,11 +669,11 @@ function getUserSubTier(userId) {
 				default: subTier = '?';
 			}
 		}
+		return Promise.resolve(subTier);
 	})
 	.catch((err) => {
-		// channel probably doesn't have a sub program
+		return Promise.resolve('Pleb');
 	});
-	return subTier;
 }
 
 function getBeatmapIdFromMessage(message) {

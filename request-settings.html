@@ -36,6 +36,10 @@
 			<vaadin-checkbox checked="{{requests.cooldown.twitchResponse.enabled}}">Request on cooldown response</vaadin-checkbox>
 			<vaadin-text-field label="Request on cooldown response text" value="{{requests.cooldown.twitchResponse.message}}"></vaadin-text-field>
 			<div class="message-example">[[_messageExample(requests.cooldown.twitchResponse.message)]]</div>
+			<vaadin-checkbox checked="{{requests.noDuplicates.enabled}}">No duplicate requests</vaadin-checkbox>
+			<vaadin-checkbox checked="{{requests.noDuplicates.twitchResponse.enabled}}">Duplicate response</vaadin-checkbox>
+			<vaadin-text-field label="Duplicate Twitch chat response text" value="{{requests.noDuplicates.twitchResponse.message}}"></vaadin-text-field>
+			<div class="message-example">[[_messageExample(requests.noDuplicates.twitchResponse.message)]]</div>
 			<vaadin-button on-click="_save">Save</vaadin-button>
 		</div>
 		<paper-toast id="toast" text="[[message]]"></paper-toast>

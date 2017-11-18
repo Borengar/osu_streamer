@@ -12,13 +12,32 @@
 				color: white;
 				width: 160px;
 			}
+			.viewers-column {
+				width: 300px;
+				margin: 10px;
+				font-size: 26px;
+				color: #b17;
+			}
 		</style>
-		<div class="flex layout vertical">
-			<vaadin-checkbox checked="{{viewers.enabled}}">Enabled</vaadin-checkbox>
-			<vaadin-text-field label="File path" value="{{viewers.filePath}}"></vaadin-text-field>
-			<vaadin-text-field label="Viewers per file" value="{{viewers.viewersPerFile}}"></vaadin-text-field>
-			<vaadin-button on-click="_save">Save</vaadin-button>
-			<vaadin-button on-click="_reset">Reset list</vaadin-button>
+		<div class="flex layout horizontal">
+			<div class="flex layout vertical">
+				<vaadin-checkbox checked="{{viewers.enabled}}">Enabled</vaadin-checkbox>
+				<vaadin-text-field label="File path" value="{{viewers.filePath}}"></vaadin-text-field>
+				<vaadin-text-field label="Viewers per file" value="{{viewers.viewersPerFile}}"></vaadin-text-field>
+				<vaadin-text-field label="Number of files" value="{{viewers.numberOfFiles}}"></vaadin-text-field>
+				<vaadin-button on-click="_save">Save</vaadin-button>
+				<vaadin-button on-click="_reset">Reset list</vaadin-button>
+			</div>
+			<div class="layout vertical viewers-column">
+				<template is="dom-repeat" items="[[viewers1]]" as="viewer">
+					<div class="viewer">[[viewer]]</div>
+				</template>
+			</div>
+			<div class="layout vertical viewers-column">
+				<template is="dom-repeat" items="[[viewers2]]" as="viewer">
+					<div class="viewer">[[viewer]]</div>
+				</template>
+			</div>
 		</div>
 		<paper-toast id="toast" text="[[message]]"></paper-toast>
 	</template>
@@ -36,6 +55,15 @@
 				super.ready();
 				ipcRenderer.on('config', (event, args) => {
 					this.viewers = args.viewers;
+				});
+				ipcRenderer.on('viewers', (event, args) => {
+					this.maxAmountOfViewers = this.viewers.viewersPerFile * this.viewers.numberOfFiles;
+					this.set('viewers1', args.filter((element, index) => {
+						return index < this.maxAmountOfViewers / 2;
+					}));
+					this.set('viewers2', args.filter((element, index) => {
+						return index >= this.maxAmountOfViewers / 2 && index < this.maxAmountOfViewers;
+					}));
 				});
 			}
 
