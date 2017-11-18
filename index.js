@@ -178,12 +178,17 @@ function twitchLogin() {
 		});
 		twitchClient.on('subscription', (channelName, username, method, message, userstate) => {
 			if (config.spam.enabled) {
-				twitchMessageQueue.push(config.spam.message.replace(/{user}/g, userstateToName(userstate)));
+				twitchMessageQueue.push(config.spam.message.replace(/{user}/g, username));
 			}
 		});
 		twitchClient.on('resub', (channelName, username, months, message, userstate, methods) => {
 			if (config.spam.enabled) {
-				twitchMessageQueue.push(config.spam.message.replace(/{user}/g, userstateToName(userstate)));
+				twitchMessageQueue.push(config.spam.message.replace(/{user}/g, username));
+			}
+		});
+		twitchClient.on('subgift', (channelName, username, method, message, userstate, recipient) => {
+			if (config.spam.enabled) {
+				twitchMessageQueue.push(config.spam.message.replace(/{user}/g, username).replace(/{recipient}/g, recipient));
 			}
 		});
 		twitchClient.on('message', (channelName, userstate, message, self) => {
