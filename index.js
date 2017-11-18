@@ -192,7 +192,7 @@ function twitchLogin() {
 		});
 		twitchClient.on('subgift', (channelName, username, method, message, userstate, recipient) => {
 			if (config.spam.enabled) {
-				twitchMessageQueue.push(config.spam.message.replace(/{user}/g, username).replace(/{recipient}/g, recipient));
+				twitchMessageQueue.push(config.spam.giftMessage.replace(/{user}/g, username).replace(/{recipient}/g, recipient));
 			}
 		});
 		twitchClient.on('message', (channelName, userstate, message, self) => {
@@ -456,7 +456,8 @@ function loadConfig() {
 			},
 			spam: {
 				enabled: true,
-				message: '{user} stickGold {user} stickGold {user} stickGold {user} stickGold {user} stickGold {user} stickGold'
+				message: '{user} stickGold {user} stickGold {user} stickGold {user} stickGold {user} stickGold {user} stickGold',
+				giftMessage: '{user} gifted {recipient} a sub'
 			},
 			events: {
 				rank: {
@@ -529,6 +530,9 @@ function loadConfig() {
 					message: '{requester} this map already got requested'
 				}
 			}
+		}
+		if (!config.spam.hasOwnProperty('giftMessage')) {
+			config.spam.giftMessage = '{user} gifted {recipient} a sub';
 		}
 		saveConfig();
 	}

@@ -20,7 +20,9 @@
 		<div class="flex layout vertical">
 			<vaadin-checkbox checked="{{spam.enabled}}">Enabled</vaadin-checkbox>
 			<paper-textarea label="Message" value="{{spam.message}}"></paper-textarea>
-			<div class="message-example">[[_messageExample(spam.message, twitchUser)]]</div>
+			<div class="message-example">[[_messageExample(spam.message)]]</div>
+			<paper-textarea label="Gift message" value="{{spam.giftMessage}}"></paper-textarea>
+			<div class="message-example">[[_giftMessageExample(spam.giftMessage)]]</div>
 			<vaadin-button on-click="_save">Save</vaadin-button>
 		</div>
 		<paper-toast id="toast" text="Settings saved"></paper-toast>
@@ -40,9 +42,6 @@
 				ipcRenderer.on('config', (event, args) => {
 					this.spam = args.spam;
 				});
-				ipcRenderer.on('twitchUser', (event, args) => {
-					this.twitchUser = args;
-				});
 			}
 
 			_save() {
@@ -51,7 +50,14 @@
 			}
 
 			_messageExample(message, twitchUser) {
-				return message.replace(/{user}/g, twitchUser);
+				message = message.replace(/{user}/g, 'GVmG');
+				return message;
+			}
+
+			_giftMessageExample(message, twitchUser) {
+				message = message.replace(/{user}/g, 'GVmG');
+				message = message.replace(/{recipient}/g, 'Nightbot');
+				return message;
 			}
 		}
 
