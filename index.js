@@ -652,7 +652,7 @@ function saveLevels() {
 }
 
 function getUserSubTier(userId) {
-	request({
+	return request({
 		url: 'https://api.twitch.tv/kraken/channels/' + channel._id + '/subscriptions/' + userId,
 		headers: {
 			'Accept': 'application/vnd.twitchtv.v5+json',
