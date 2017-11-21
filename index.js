@@ -310,7 +310,6 @@ function twitchLogin() {
 }
 
 function requestBeatmap(beatmapId, mods, username, subTier) {
-	console.log('test');
 	if (config.requests.noDuplicates.enabled && requests.some((beatmap) => {
 		return beatmap.beatmapId == beatmapId;
 	})) {
