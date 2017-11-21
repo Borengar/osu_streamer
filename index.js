@@ -688,7 +688,7 @@ function getBeatmapIdFromMessage(message) {
 		return Promise.resolve(match[0].substring(2));
 	}
 
-	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+#osu/[0-9]+.*');
+	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+/?#osu/[0-9]+.*');
 	if (regexp.test(message)) {
 		regexp = /#osu\/[0-9]+/g
 		match = regexp.exec(message);
