@@ -1,0 +1,80 @@
+<dom-module id="countdown-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			vaadin-text-field {
+				margin: 0 10px;
+				width: 1000px;
+			}
+			vaadin-button {
+				background-color: #b17;
+				color: white;
+				width: 160px;
+			}
+			paper-spinner {
+				margin-top: 8px;
+			}
+			.message-example {
+				margin: 10px;
+				color: grey;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<vaadin-text-field label="Message" value="{{countdown.message}}" disabled="[[countdown.enabled]]"></vaadin-text-field>
+			<div class="message-example">[[_messageExample(countdown.message)]]</div>
+			<vaadin-text-field label="Total time in minutes" value="{{countdown.totalTime}}" disabled="[[countdown.enabled]]"></vaadin-text-field>
+			<vaadin-text-field label="Message interval in minutes" value="{{countdown.interval}}" disabled="[[countdown.enabled]]"></vaadin-text-field>
+			<template is="dom-if" if="[[!countdown.enabled]]">
+				<vaadin-button on-click="_start">Start</vaadin-button>
+			</template>
+			<template is="dom-if" if="[[countdown.enabled]]">
+				<div class="layout horizontal">
+					<vaadin-button on-click="_stop">Stop</vaadin-button>
+					<paper-spinner active></paper-spinner>
+				</div>
+			</template>
+		</div>
+		<paper-toast id="toast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class CountdownPage extends Polymer.Element {
+			static get is() { return 'countdown-page'; }
+
+			static get properties() {
+				return {
+					
+				}
+			}
+
+			ready() {
+				super.ready();
+				ipcRenderer.on('config', (event, args) => {
+					this.countdown = args.countdown;
+				});
+				ipcRenderer.on('countdownTick', (event, args) => {
+					this.set('countdown.totalTime', this.countdown.totalTime - 1);
+				});
+			}
+
+			_messageExample(message) {
+				message = message.replace(/{time}/g, '10');
+				return message;
+			}
+
+			_start() {
+				this.set('countdown.enabled', true);
+				ipcRenderer.send('countdownConfig', this.countdown);
+				this.message = 'Timer started';
+				this.$.toast.open();
+			}
+
+			_stop() {
+				this.set('countdown.enabled', false);
+				ipcRenderer.send('countdownConfig', this.countdown);
+				this.message = 'Timer stopped';
+				this.$.toast.open();
+			}
+		}
+
+		window.customElements.define(CountdownPage.is, CountdownPage);
+	</script>
+</dom-module>

@@ -25,6 +25,7 @@ var levels;
 var levelsTimer;
 var eventTimer;
 var npTimer;
+var countdownTimer;
 var twitchMessageTimer;
 var twitchMessageQueue = [];
 var subOnlyOnCooldown = false;
@@ -482,6 +483,12 @@ function loadConfig() {
 			np: {
 				enabled: true,
 				filePath: 'np'
+			},
+			countdown: {
+				enabled: false,
+				message: 'Countdown ends in {time}',
+				totalTime: 10,
+				interval: 1
 			}
 		}
 		saveConfig();
@@ -532,6 +539,14 @@ function loadConfig() {
 		}
 		if (!config.spam.hasOwnProperty('giftMessage')) {
 			config.spam.giftMessage = '{user} gifted {recipient} a sub';
+		}
+		if (!config.hasOwnProperty('countdown')) {
+			config.countdown = {
+				enabled: false,
+				message: 'Countdown ends in {time}',
+				totalTime: 10,
+				interval: 1
+			}
 		}
 		saveConfig();
 	}
@@ -771,6 +786,35 @@ ipcMain.on('npConfig', (event, args) => {
 	saveConfig();
 });
 
+ipcMain.on('countdownConfig', (event, args) => {
+	config.countdown = args;
+	if (args.enabled) {
+		countdownTimer = setInterval(() => {
+			config.countdown.totalTime--;
+			mainWindow.webContents.send('countdownTick');
+			if (config.countdown.totalTime % config.countdown.interval == 0) {
+				let chatMessage = config.countdown.message;
+				chatMessage = chatMessage.replace(/{time}/g, config.countdown.totalTime);
+				twitchMessageQueue.push(chatMessage);
+				if (config.countdown.totalTime == 0) {
+					stopCountdown();
+				}
+			}
+			saveConfig();
+		}, 60000);
+	} else {
+		stopCountdown();
+	}
+});
+
+function stopCountdown() {
+	clearInterval(countdownTimer);
+	countdownTimer = null;
+	config.countdown.enabled = false;
+	mainWindow.webContents.send('config', config);
+	saveConfig();
+}
+
 ipcMain.on('resetViewers', (event, args) => {
 	viewers = [];
 	deleteViewerFiles();
@@ -779,5 +823,6 @@ ipcMain.on('resetViewers', (event, args) => {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', () => {
+	stopCountdown();
 	app.quit();
 });
