@@ -588,7 +588,7 @@ function loadConfig() {
 						twitchMessageQueue.push(chatMessage);
 						config.events.pp.current = statisticsData.pp;
 					}
-					if (config.events.topRanks.enabled && userData.recentActivities[0].id != config.events.topRanks.last) {
+					if (config.events.topRanks.enabled && userData.recentActivities[0].id != config.events.topRanks.last && userData.recentActivities[0].type == 'rank') {
 						let chatMessage = config.events.topRanks.message;
 						chatMessage = chatMessage.replace(/{username}/g, config.osu.username);
 						chatMessage = chatMessage.replace(/{rank}/g, userData.recentActivities[0].rank);
