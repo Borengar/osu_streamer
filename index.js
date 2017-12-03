@@ -104,7 +104,7 @@ function createWindow() {
     	}));
     }
 	});
-	loginWindow.loadURL('https://api.twitch.tv/kraken/oauth2/authorize?client_id=' + clientId + '&redirect_uri=http://localhost&response_type=token&scope=chat_login+channel_check_subscription+user_read&force_verify=true');
+	loginWindow.loadURL('https://api.twitch.tv/kraken/oauth2/authorize?client_id=' + clientId + '&redirect_uri=http://localhost&response_type=token&scope=chat_login+channel_check_subscription+user_read+channel_editor&force_verify=true');
 }
 
 function deleteViewerFiles(callback) {
@@ -488,7 +488,8 @@ function loadConfig() {
 				enabled: false,
 				message: 'Countdown ends in {time}',
 				totalTime: 10,
-				interval: 1
+				interval: 1,
+				writeTitle: false
 			}
 		}
 		saveConfig();
@@ -547,6 +548,9 @@ function loadConfig() {
 				totalTime: 10,
 				interval: 1
 			}
+		}
+		if (!config.countdown.hasOwnProperty('writeTitle')) {
+			config.countdown.writeTitle = false;
 		}
 		saveConfig();
 	}
@@ -795,7 +799,31 @@ ipcMain.on('countdownConfig', (event, args) => {
 			if (config.countdown.totalTime % config.countdown.interval == 0) {
 				let chatMessage = config.countdown.message;
 				chatMessage = chatMessage.replace(/{time}/g, config.countdown.totalTime);
-				twitchMessageQueue.push(chatMessage);
+				if (config.countdown.writeTitle) {
+					request.put({
+						url: 'https://api.twitch.tv/kraken/channels/' + channel._id,
+						headers: {
+							'Accept': 'application/vnd.twitchtv.v5+json',
+							'Client-ID': clientId,
+							'Authorization': 'OAuth ' + accessToken
+						},
+						gzip: true,
+						json: true,
+						body: {
+							channel: {
+								status: chatMessage
+							}
+						}
+					})
+					.then((body) => {
+						// everything is ok
+					})
+					.catch((err) => {
+						console.error(err);
+					});
+				} else {
+					twitchMessageQueue.push(chatMessage);
+				}
 				if (config.countdown.totalTime == 0) {
 					stopCountdown();
 				}
