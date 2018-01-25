@@ -206,54 +206,42 @@ function twitchLogin() {
 					createViewerFiles();
 				}
 			}
-			if (config.requests.enabled) {
-				if (message.includes('osu.ppy.sh')) {
-					Promise.all([getBeatmapIdFromMessage(message), getUserSubTier(userstate['user-id'])])
-					.then(([beatmapId, subTier]) => {
-						if (config.requests.subOnly.enabled && subTier == 'Pleb') {
-							if (config.requests.subOnly.twitchResponse.enabled && !subOnlyOnCooldown) {
-								let chatMessage = config.requests.subOnly.twitchResponse.message;
+			if (config.requests.enabled && message.includes('osu.ppy.sh')) {
+				Promise.all([getBeatmapIdFromMessage(message), getUserSubTier(userstate['user-id'])])
+				.then(([beatmapId, subTier]) => {
+					if (subTier == 'Pleb' && config.requests.subOnly.enabled) {
+						if (config.requests.subOnly.twitchResponse.enabled && !subOnlyOnCooldown) {
+							let chatMessage = config.requests.subOnly.twitchResponse.message;
+							chatMessage = chatMessage.replace(/{requester}/g, username);
+							twitchMessageQueue.push(chatMessage);
+							subOnlyOnCooldown = true;
+							setTimeout(() => {
+								subOnlyOnCooldown = false;
+							}, 30000);
+						}
+					} else {
+						if (config.requests.cooldown.enabled && requestCooldowns.includes(userstate['user-id'])) {
+							if (config.requests.cooldown.twitchResponse.enabled) {
+								let chatMessage = config.requests.cooldown.twitchResponse.message;
 								chatMessage = chatMessage.replace(/{requester}/g, username);
 								twitchMessageQueue.push(chatMessage);
-								subOnlyOnCooldown = true;
-								setTimeout(() => {
-									subOnlyOnCooldown = false;
-								}, 30000);
 							}
 						} else {
-							if (config.requests.cooldown.enabled && requestCooldowns.includes(username)) {
-								if (config.requests.cooldown.twitchResponse.enabled) {
-									let chatMessage = config.requests.cooldown.twitchResponse.message;
-									chatMessage = chatMessage.replace(/{requester}/g, username);
-									twitchMessageQueue.push(chatMessage);
+							let mods = [];
+							['NF', 'EZ', 'HD', 'HR', 'DT', 'HT', 'NC', 'FL', 'SO'].forEach((item) => {
+								if (message.includes(item)) {
+									mods.push(item);
 								}
-							} else {
-								let mods = [];
-								if (message.includes('HD')) {
-									mods.push('HD');
-								}
-								if (message.includes('HR')) {
-									mods.push('HR');
-								}
-								if (message.includes('DT')) {
-									mods.push('DT');
-								}
+							});
 
-								requestBeatmap(beatmapId, mods, username, subTier);
-
-								if (config.requests.cooldown.enabled && (!config.requests.cooldown.plebOnly || (config.requests.cooldown.plebOnly && subTier == 'Pleb'))) {
-									requestCooldowns.push(username);
-									setTimeout(() => {
-										requestCooldowns.splice(requestCooldowns.indexOf(username), 1);
-									}, config.requests.cooldown.seconds * 1000);
-								}
-							}
+							requestBeatmap(beatmapId, mods, username, subTier);
+							putRequesterOnCooldown(userstate['user-id'], subTier);
 						}
-					})
-					.catch((err) => {
-						// no beatmap link found in message
-					});
-				}
+					}
+				})
+				.catch((err) => {
+					// no beatmap link found in message
+				});
 			}
 			if (config.levels.enabled) {
 				let userObject = levels.find((item) => {
@@ -310,6 +298,59 @@ function twitchLogin() {
 	}
 }
 
+function getBeatmapIdFromMessage(message) {
+	let regexp = new RegExp('https?://osu.ppy.sh/b/[0-9]+.*');
+	let match;
+	if (regexp.test(message)) {
+		regexp = /b\/[0-9]+/g
+		match = regexp.exec(message);
+		return Promise.resolve(match[0].substring(2));
+	}
+
+	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+/?#osu/[0-9]+.*');
+	if (regexp.test(message)) {
+		regexp = /#osu\/[0-9]+/g
+		match = regexp.exec(message);
+		return Promise.resolve(match[0].substring(5));
+	}
+
+	regexp = new RegExp('https?://osu.ppy.sh/s/[0-9]+.*');
+	if (!regexp.test(message)) {
+		return Promise.reject('No beatmap link found');
+	}
+	regexp = /s\/[0-9]+/g
+	match = regexp.exec(message);
+	let beatmapsetId = match[0].substring(2);
+
+	convertBeatmapsetIdToBeatmapId(beatmapsetId)
+	.then((beatmapId) => {
+		return Promise.resolve(beatmapId);
+	})
+	.catch((err) => {
+		return Promise.reject(new Error(err));
+	});
+}
+
+function convertBeatmapsetIdToBeatmapId(beatmapsetId) {
+	return request('https://osu.ppy.sh/beatmapsets/' + beatmapsetId)
+	.then((body) => {
+		let $ = cheerio.load(body);
+		let beatmapset = JSON.parse($('#json-beatmapset').html());
+		let highestStar = 0;
+		let beatmapId;
+		for (var i = 0; i < beatmapset.beatmaps.length; i++) {
+			if (beatmapset.beatmaps[i].difficulty_rating > highestStar) {
+				beatmapId = beatmapset.beatmaps[i].id;
+				highestStar = beatmapset.beatmaps[i].difficulty_rating;
+			}
+		}
+		return Promise.resolve(beatmapId);
+	})
+	.catch((err) => {
+		return Promise.reject(err);
+	});
+}
+
 function requestBeatmap(beatmapId, mods, username, subTier) {
 	if (config.requests.noDuplicates.enabled && requests.some((beatmap) => {
 		return beatmap.beatmapId == beatmapId;
@@ -318,14 +359,24 @@ function requestBeatmap(beatmapId, mods, username, subTier) {
 			let chatMessage = config.requests.noDuplicates.twitchResponse.message.replace(/{requester}/g, username);
 			twitchMessageQueue.push(chatMessage);
 		}
-	} else {
-		Promise.all([request('https://osu.ppy.sh/beatmaps/' + beatmapId), request('https://osu.ppy.sh/osu/' + beatmapId)])
-		.then(([mapData, mapFile]) => {
-			let $ = cheerio.load(mapData);
-			let beatmapset = JSON.parse($('#json-beatmapset').html());
-			let beatmapData = beatmapset.beatmaps.find((item) => {
-				return item.id == beatmapId;
-			});
+	}
+
+
+	Promise.all([request('https://osu.ppy.sh/beatmaps/' + beatmapId), request('https://osu.ppy.sh/osu/' + beatmapId)])
+	.then(([mapData, mapFile]) => {
+		let $ = cheerio.load(mapData);
+		let beatmapset = JSON.parse($('#json-beatmapset').html());
+		let beatmapData = beatmapset.beatmaps.find((item) => {
+			return item.id == beatmapId;
+		});
+		if (config.requests.noDuplicates.enabled && requests.some((beatmapsetId) => {
+			return beatmapsetId == beatmapset.id;
+		})) {
+			if (config.requests.noDuplicates.twitchResponse.enabled) {
+				let chatMessage = config.requests.noDuplicates.twitchResponse.message.replace(/{requester}/g, username);
+				twitchMessageQueue.push(chatMessage);
+			}
+		} else {
 			fs.writeFile('oppai/' + beatmapId + '.osu', mapFile, (err) => {
 				execFile('oppai/oppai', ['oppai/' + beatmapId + '.osu', '+' + mods.join(''), '-ojson'], (err, data) => {
 					if (err) {
@@ -356,7 +407,7 @@ function requestBeatmap(beatmapId, mods, username, subTier) {
 						pp: data.pp.toFixed(2)
 					}
 					mainWindow.webContents.send('newRequest', beatmap);
-					requests.push(beatmap);
+					requests.push(beatmapset.id);
 					let chatMessage = config.requests.twitchResponse.message;
 					if (config.requests.twitchResponse.enabled) {
 						chatMessage = messageReplace(config.requests.twitchResponse.message, beatmap);
@@ -368,10 +419,19 @@ function requestBeatmap(beatmapId, mods, username, subTier) {
 					}
 				});
 			});
-		})
-		.catch((err) => {
-			console.error(err);
-		});
+		}
+	})
+	.catch((err) => {
+		console.error(err);
+	});
+}
+
+function putRequesterOnCooldown(userId, subTier) {
+	if (config.requests.cooldown.enabled && (!config.requests.cooldown.plebOnly || (config.requests.cooldown.plebOnly && subTier == 'Pleb'))) {
+		requestCooldowns.push(userId);
+		setTimeout(() => {
+			requestCooldowns.splice(requestCooldowns.indexOf(userId), 1);
+		}, config.requests.cooldown.seconds * 1000);
 	}
 }
 
@@ -695,49 +755,6 @@ function getUserSubTier(userId) {
 	})
 	.catch((err) => {
 		return Promise.resolve('Pleb');
-	});
-}
-
-function getBeatmapIdFromMessage(message) {
-	let regexp = new RegExp('https?://osu.ppy.sh/b/[0-9]+.*');
-	let match;
-	if (regexp.test(message)) {
-		regexp = /b\/[0-9]+/g
-		match = regexp.exec(message);
-		return Promise.resolve(match[0].substring(2));
-	}
-
-	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+/?#osu/[0-9]+.*');
-	if (regexp.test(message)) {
-		regexp = /#osu\/[0-9]+/g
-		match = regexp.exec(message);
-		return Promise.resolve(match[0].substring(5));
-	}
-
-	regexp = new RegExp('https?://osu.ppy.sh/s/[0-9]+.*');
-	if (!regexp.test(message)) {
-		return Promise.reject('No beatmap link found');
-	}
-	regexp = /s\/[0-9]+/g
-	match = regexp.exec(message);
-	let beatmapsetId = match[0].substring(2);
-
-	return request('https://osu.ppy.sh/beatmapsets/' + beatmapsetId)
-	.then((body) => {
-		let $ = cheerio.load(body);
-		let beatmapset = JSON.parse($('#json-beatmapset').html());
-		let highestStar = 0;
-		let beatmapId;
-		for (var i = 0; i < beatmapset.beatmaps.length; i++) {
-			if (beatmapset.beatmaps[i].difficulty_rating > highestStar) {
-				beatmapId = beatmapset.beatmaps[i].id;
-				highestStar = beatmapset.beatmaps[i].difficulty_rating;
-			}
-		}
-		return Promise.resolve(beatmapId);
-	})
-	.catch((err) => {
-		console.error(err);
 	});
 }
 
