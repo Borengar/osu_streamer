@@ -12,6 +12,7 @@
     "cheerio": "^1.0.0-rc.2",
     "electron": "^1.7.11",
     "irc": "^0.5.0",
+    "ojsama": "^1.0.15",
     "request-promise": "^4.2.2",
     "tmi.js": "^1.2.1"
   }
