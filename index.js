@@ -315,6 +315,27 @@ function getBeatmapIdFromMessage(message) {
 		return Promise.resolve(match[0].substring(5));
 	}
 
+	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+/?#mania/[0-9]+.*');
+	if (regexp.test(message)) {
+		regexp = /#mania\/[0-9]+/g
+		match = regexp.exec(message);
+		return Promise.resolve(match[0].substring(7));
+	}
+
+	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+/?#taiko/[0-9]+.*');
+	if (regexp.test(message)) {
+		regexp = /#taiko\/[0-9]+/g
+		match = regexp.exec(message);
+		return Promise.resolve(match[0].substring(7));
+	}
+
+	regexp = new RegExp('https?://osu.ppy.sh/beatmapsets/[0-9]+/?#fruits/[0-9]+.*');
+	if (regexp.test(message)) {
+		regexp = /#fruits\/[0-9]+/g
+		match = regexp.exec(message);
+		return Promise.resolve(match[0].substring(8));
+	}
+
 	regexp = new RegExp('https?://osu.ppy.sh/s/[0-9]+.*');
 	if (!regexp.test(message)) {
 		return Promise.reject('No beatmap link found');
@@ -378,44 +399,79 @@ function requestBeatmap(beatmapId, mods, username, subTier) {
 				twitchMessageQueue.push(chatMessage);
 			}
 		} else {
-			let parser = new ojsama.parser();
-			parser.feed(mapFile);
-			let map = parser.map;
-			let stars = new ojsama.diff().calc({map: map, mods: ojsama.modbits.from_string(mods.join(''))});
-			let pp = ojsama.ppv2({
-				stars: stars,
-				combo: map.max_combo(),
-				nmiss: 0,
-				acc_percent: 100
-			});
-			let beatmap = {
-				accuracy: map.od.toFixed(1),
-				ar: map.ar,
-				artist: beatmapset.artist,
-				beatmapId: beatmapId,
-				beatmapsetId: beatmapset.id,
-				bpm: mods.includes('DT') ? beatmapset.bpm * 1.5 : beatmapset.bpm,
-				countCircles: beatmapData.count_circles,
-				countSliders: beatmapData.count_sliders,
-				cover: beatmapset.covers['cover@2x'],
-				cs: map.cs,
-				difficultyRating: stars.total.toFixed(2),
-				drain: map.hp,
-				previewUrl: beatmapset.preview_url,
-				title: beatmapset.title,
-				totalLength: beatmapData.total_length * 2/3,
-				status: beatmapset.status,
-				version: beatmapData.version,
-				mods: mods,
-				requester: username,
-				subTier: subTier,
-				pp: pp.total.toFixed(2)
+			let beatmap;
+			if (beatmapData.mode == 'osu') {
+				let parser = new ojsama.parser();
+				parser.feed(mapFile);
+				let map = parser.map;
+				let stars = new ojsama.diff().calc({map: map, mods: ojsama.modbits.from_string(mods.join(''))});
+				let pp = ojsama.ppv2({
+					stars: stars,
+					combo: map.max_combo(),
+					nmiss: 0,
+					acc_percent: 100
+				});
+				beatmap = {
+					accuracy: map.od.toFixed(1),
+					ar: map.ar,
+					artist: beatmapset.artist,
+					beatmapId: beatmapId,
+					beatmapsetId: beatmapset.id,
+					bpm: mods.includes('DT') ? beatmapset.bpm * 1.5 : beatmapset.bpm,
+					countCircles: beatmapData.count_circles,
+					countSliders: beatmapData.count_sliders,
+					cover: beatmapset.covers['cover@2x'],
+					cs: map.cs,
+					difficultyRating: stars.total.toFixed(2),
+					drain: map.hp,
+					previewUrl: beatmapset.preview_url,
+					title: beatmapset.title,
+					totalLength: beatmapData.total_length * 2/3,
+					status: beatmapset.status,
+					version: beatmapData.version,
+					mode: beatmapData.mode,
+					mods: mods,
+					requester: username,
+					subTier: subTier,
+					pp: pp.total.toFixed(2)
+				}
+			} else {
+				beatmap = {
+					accuracy: beatmapData.accuracy.toFixed(1),
+					ar: beatmapData.ar,
+					artist: beatmapset.artist,
+					beatmapId: beatmapId,
+					beatmapsetId: beatmapset.id,
+					bpm: mods.includes('DT') ? beatmapset.bpm * 1.5 : beatmapset.bpm,
+					countCircles: beatmapData.count_circles,
+					countSliders: beatmapData.count_sliders,
+					cover: beatmapset.covers['cover@2x'],
+					cs: beatmapData.cs,
+					difficultyRating: beatmapData.difficulty_rating.toFixed(2),
+					drain: beatmapData.drain,
+					previewUrl: beatmapset.preview_url,
+					title: beatmapset.title,
+					totalLength: beatmapData.total_length * 2/3,
+					status: beatmapset.status,
+					version: beatmapData.version,
+					mode: beatmapData.mode,
+					mods: mods,
+					requester: username,
+					subTier: subTier,
+					pp: '?'
+				}
 			}
 			mainWindow.webContents.send('newRequest', beatmap);
 			requests.push(beatmapset.id);
 			let chatMessage = config.requests.twitchResponse.message;
 			if (config.requests.twitchResponse.enabled) {
 				chatMessage = messageReplace(config.requests.twitchResponse.message, beatmap);
+				switch (beatmap.mode) {
+					case 'osu': chatMessage = '🔴 ' + chatMessage; break;
+					case 'mania': chatMessage = '🎹 ' + chatMessage; break;
+					case 'fruits': chatMessage = '🍐 ' + chatMessage; break;
+					case 'taiko': chatMessage = '🥁 ' + chatMessage; break;
+				}
 				twitchMessageQueue.push(chatMessage);
 			}
 			if (config.requests.osuResponse.enabled && osuClient) {
